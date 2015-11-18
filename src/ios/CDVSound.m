@@ -224,10 +224,7 @@
         [self.commandDelegate evalJs:jsString];
     } else {
         NSURL* resourceUrl = [[NSURL alloc] initWithString:resourcePath];
-        NSLog(@"resourceUrl: %@", resourceUrl);
-        NSLog(@"resourcePath: %@", resourcePath);
-        NSString* test = [resourceUrl absoluteString];
-        NSLog(@"absolute string: %@", test);
+
         if (![resourceUrl isFileURL] && ![resourcePath hasPrefix:CDVFILE_PREFIX]) {
             // First create an AVPlayerItem
             AVPlayerItem* playerItem = [AVPlayerItem playerItemWithURL:resourceUrl];
@@ -340,8 +337,8 @@
             if (!bError) {
                 NSLog(@"Playing audio sample '%@'", audioFile.resourcePath);
                 double position = 0;
-                if (avPlayer) {
-                    CMTime time = [avPlayer currentTime];
+                if (avPlayer.currentItem && avPlayer.currentItem.asset) {
+                    CMTime time = avPlayer.currentItem.asset.duration;
                     position = CMTimeGetSeconds(time);
                     NSLog(@"Playing stream with AVPlayer");
                     [avPlayer play];
@@ -367,7 +364,7 @@
                     }
 
                     [audioFile.player play];
-                    //double position = round(audioFile.player.duration * 1000) / 1000;
+                    position = round(audioFile.player.duration * 1000) / 1000;
                 }
 
                 jsString = [NSString stringWithFormat:@"%@(\"%@\",%d,%.3f);\n%@(\"%@\",%d,%d);", @"cordova.require('cordova-plugin-media.Media').onStatus", mediaId, MEDIA_DURATION, position, @"cordova.require('cordova-plugin-media.Media').onStatus", mediaId, MEDIA_STATE, MEDIA_RUNNING];
@@ -461,7 +458,18 @@
         [audioFile.player stop];
         audioFile.player.currentTime = 0;
         jsString = [NSString stringWithFormat:@"%@(\"%@\",%d,%d);", @"cordova.require('cordova-plugin-media.Media').onStatus", mediaId, MEDIA_STATE, MEDIA_STOPPED];
-    }  // ignore if no media playing
+    }
+    if (avPlayer.currentItem && avPlayer.currentItem.asset) {
+        NSLog(@"Stopped playing audio sample '%@'", audioFile.resourcePath);
+        [avPlayer seekToTime: kCMTimeZero
+                     toleranceBefore: kCMTimeZero
+                      toleranceAfter: kCMTimeZero
+                   completionHandler: ^(BOOL finished){
+                           if (finished) [avPlayer pause];
+                       }];
+        jsString = [NSString stringWithFormat:@"%@(\"%@\",%d,%d);", @"cordova.require('cordova-plugin-media.Media').onStatus", mediaId, MEDIA_STATE, MEDIA_STOPPED];
+    }
+    // ignore if no media playing
     if (jsString) {
         [self.commandDelegate evalJs:jsString];
     }
